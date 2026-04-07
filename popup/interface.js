@@ -241,7 +241,7 @@ async function get_stats() {
             let fourcat_button = createElement("button", {
                 "data-platform": platform,
                 "class": "upload-to-4cat",
-            }, "to 4CAT");
+            }, "to FeedFreak");
 
             actions.appendChild(clear_button);
             actions.appendChild(download_button);
