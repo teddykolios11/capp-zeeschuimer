@@ -1,3 +1,4 @@
+const CLEARFEED_URL = 'http://localhost:8000'; // ADDED THIS!
 const background = browser.extension.getBackgroundPage();
 var have_4cat = false;
 var xhr;
@@ -123,14 +124,9 @@ function activate_buttons() {
         let new_status = current;
 
         if(button.classList.contains('upload-to-4cat') && !is_uploading) {
-            new_status = !(items > 0 && have_4cat);
-            if(new_status && !have_4cat) {
-                button.classList.add('tooltippable');
-                button.setAttribute('title', 'Configure a 4CAT URL to enable uploading to 4CAT');
-            } else {
-                button.classList.remove('tooltippable');
-                button.setAttribute('title', '');
-            }
+            new_status = !(items > 0); //REMOVED have_4cat dependency!
+            button.classList.remove('tooltippable');
+            button.setAttribute('title', '');
 
         } else if(button.classList.contains('download-ndjson') || button.classList.contains('reset')) {
             new_status = !(items > 0);
@@ -338,67 +334,39 @@ async function button_handler(event) {
 
         event.target.classList.remove('loading');
 
+    // UPDATED THIS BLOCK TO ROUTE TO UPDATED THIS BLOCK TO ROUTE TO CLEARFEED DJANGO BACKEND INSTEAD OF 4CAT
     } else if (event.target.matches('.upload-to-4cat')) {
         let platform = event.target.getAttribute('data-platform');
         status.innerText = 'Creating data file for uploading...';
         is_uploading = true;
-        let blob = await get_blob(platform);
-
         document.querySelectorAll('.upload-to-4cat').forEach(x => x.setAttribute('disabled', true));
+        
+        try {
+            let blob = await get_blob(platform);
+            status.innerText = 'Uploading to ClearFeed...';
 
-        xhr = new XMLHttpRequest();
-        xhr.aborted = false;
-        let upload_url = await get_4cat_url();
+            let response = await fetch('http://localhost:8000/api/import-dataset/', {
+                method: 'POST',
+                headers: {
+                    'X-Zeeschuimer-Platform': platform,
+                    'Content-Type': 'application/x-ndjson'
+                },
+                body: blob
+            });
 
-        xhr.open("POST", upload_url.trim() + "/api/import-dataset/", true);
-        xhr.setRequestHeader("X-Zeeschuimer-Platform", platform)
-        xhr.onloadstart = function () {
-            status.innerText = 'Starting upload...';
-        }
-        xhr.upload.onprogress = function (event) {
-            let pct = event.total === 0 ? '???' : Math.round(event.loaded / event.total * 100);
-            status.innerHTML = '';
-            status.appendChild(createElement('p', {}, pct + '% uploaded'));
-            status.appendChild(createElement('button', {id: 'cancel-upload'}, 'Cancel upload'));
-        }
-        xhr.onreadystatechange = function() {
-            let response = xhr.responseText.replace(/\n/g, '');
-            if(xhr.readyState === xhr.DONE) {
-                if(xhr.status === 200) {
-                    status.innerText = 'File uploaded. Waiting for processing to finish.'
-                    if (xhr.responseURL.indexOf('/login/') >= 0) {
-                        is_uploading = false;
-                        status.innerText = 'You are not logged in to this 4CAT server! Open it in a separate tab, log in and try again.'
-                        return;
-                    }
-
-                    try {
-                        response = JSON.parse(response);
-                    } catch (e) {
-                        is_uploading = false;
-                        status.innerText = 'Error during upload: malformed response from 4CAT server.';
-                        return;
-                    }
-                    upload_poll.init(response);
-                } else if(xhr.status === 429) {
-                    status.innerText = '4CAT server refused upload, too soon after previous one. Try again in a minute.'
-                } else if(xhr.status === 403) {
-                    status.innerText = 'Could not log in to 4CAT server. Make sure to log in to 4CAT in this browser.';
-                } else if(xhr.status === 404 && xhr.responseText.indexOf('Unknown platform or source format') >= 0) {
-                    status.innerText = 'The 4CAT server does not accept ' + platform + ' datasets. The 4CAT ' +
-                        'administrator may need to enable the data source or upgrade 4CAT.';
-                } else if(xhr.status === 0) {
-                    if(!xhr.aborted) {
-                        status.innerText = 'Could not connect to 4CAT server. Is the URL correct?';
-                    }
-                } else {
-                    status.innerText = 'Error ' + xhr.status + ' ' + xhr.statusText + ' during upload. Is the URL correct?';
-                }
-
-                is_uploading = false;
+            if (response.ok) {
+                status.innerText = 'Upload complete!';
+            } else {
+                status.innerText = 'Upload failed.';
             }
+    
+        } catch (err) {
+            console.error('ClearFeed upload error:', err);
+            status.innerText = 'Upload failed. Check the console for details.';
         }
-        xhr.send(blob);
+
+        is_uploading = false;
+        document.querySelectorAll('.upload-to-4cat').forEach(x => x.removeAttribute('disabled'));
 
     } else if(event.target.matches('#clear-history')) {
         await background.db.uploads.clear();
@@ -706,8 +674,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         document.querySelector('header').appendChild(version_alert);
     }
 
-    const fourcat_url = await background.browser.storage.local.get('4cat-url');
-    document.querySelector('#fourcat-url').value = fourcat_url['4cat-url'] ? fourcat_url['4cat-url'] : '';
+    // Commenting out because 4_cat specific
+   // const fourcat_url = await background.browser.storage.local.get('4cat-url');
+   // document.querySelector('#fourcat-url').value = fourcat_url['4cat-url'] ? fourcat_url['4cat-url'] : '';
 
     const duplicate_behavior = await background.browser.storage.local.get(duplicateBehaviorKey);
     const duplicate_select = document.querySelector('#duplicate-behavior');

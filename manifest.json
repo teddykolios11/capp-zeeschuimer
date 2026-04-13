@@ -8,7 +8,7 @@
 
   "browser_specific_settings": {
     "gecko": {
-      "update_url": "https://extensions.digitalmethods.net/updates.json",
+      "id": "zeeschuimer@clearfeed.com",
       "data_collection_permissions": {
         "required": ["none"]
       }

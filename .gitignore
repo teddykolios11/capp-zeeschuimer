@@ -8,3 +8,5 @@
 
 # logs
 geckodriver.log
+
+node_modules/

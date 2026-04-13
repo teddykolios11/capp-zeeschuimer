@@ -399,19 +399,8 @@
                 <tbody></tbody>
             </table>
             <button class="reset-all"><i class="fa fa-times"></i> Delete all items</button>
+            <p id="upload-status"></p>  <!-- ADDED THIS LINE SO INTERFACE.JS CAN STILL REFERENCE document.getElementById('upload-status') -->
         </div>
-    </section>
-    <section id="configuration">
-        <h2><span>Connect to 4CAT</span></h2>
-        <div class="fourcat-url-container">
-            <label>
-                <span>4CAT server URL:</span>
-                <input type="text" placeholder="https://4cat.example.com" id="fourcat-url">
-                <span class="tooltippable"
-                      title="The URL of the 4CAT server to upload datasets to. Make sure you're logged in to this URL with this browser.">?</span>
-            </label>
-        </div>
-        <p id="upload-status"></p>
     </section>
     <section>
         <h2><span>Uploaded datasets</span></h2>
