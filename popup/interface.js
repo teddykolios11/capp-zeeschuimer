@@ -351,6 +351,7 @@ async function button_handler(event) {
                     'X-Zeeschuimer-Platform': platform,
                     'Content-Type': 'application/x-ndjson'
                 },
+                credentials: 'include',
                 body: blob
             });
 

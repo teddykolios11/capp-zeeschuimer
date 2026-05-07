@@ -30,7 +30,7 @@
     "unlimitedStorage"
   ],
 
-  "incognito": "not_allowed",
+  "incognito": "spanning",
 
   "background": {
     "scripts": [

@@ -10,3 +10,5 @@
 geckodriver.log
 
 node_modules/
+
+web-ext-artifacts/
