@@ -1,26 +1,9 @@
-const CLEARFEED_URL = 'http://localhost:8000'; // ADDED THIS!
+const CLEARFEED_URL = 'http://localhost:8000'; // change to https://clearfeed.civic.garden for production
+const CLEARFEED_LOGIN_URL =  `${CLEARFEED_URL}/login/`;
 const background = browser.extension.getBackgroundPage();
-var have_4cat = false;
-var xhr;
 var is_uploading = false;
 const downloadUrls = new Map();
 const duplicateBehaviorKey = 'zs-duplicate-behavior';
-
-/**
- * StreamSaver init
- * Unused for now - see documentation for the download_blob function.
- */
-/*var fileStream;
-var writer;
-var encode = TextEncoder.prototype.encode.bind(new TextEncoder);
-
-streamSaver.mitm = 'mitm.html';
-// Abort the download stream when leaving the page
-window.isSecureContext && window.addEventListener('beforeunload', evt => {
-    writer.abort()
-    writer = undefined;
-    fileStream = undefined;
-})*/
 
 /**
  * Create DOM element
@@ -57,65 +40,7 @@ function createElement(tag, attributes={}, content=undefined, prepend_icon=undef
 }
 
 /**
- * Get URL of 4CAT instance to connect to
- *
- * This is stored in the LocalStorage.
- *
- * @param e
- * @returns {Promise<*>}
- */
-async function get_4cat_url(e) {
-    let url = await background.browser.storage.local.get(['4cat-url']);
-    if (url['4cat-url']) {
-        url = url['4cat-url'];
-    } else {
-        url = '';
-    }
-
-    return url;
-}
-
-/**
- * Set URL of 4CAT instance to connect to
- *
- * This is stored in the LocalStorage.
- *
- * @param e
- * @returns {Promise<void>}
- */
-async function set_4cat_url(e) {
-    if(e !== true && !e.target.matches('#fourcat-url')) {
-        return;
-    }
-
-    let url;
-    if(e !== true) {
-        url = document.querySelector('#fourcat-url').value;
-        if(url.length > 0) {
-            if (url.indexOf('://') === -1) {
-                url = 'http://' + url;
-            }
-            url = url.split('/').slice(0, 3).join('/');
-        }
-        await background.browser.storage.local.set({'4cat-url': url});
-    } else {
-        url = await background.browser.storage.local.get(['4cat-url']);
-        if(url['4cat-url']) {
-            url = url['4cat-url'];
-        } else {
-            url = '';
-        }
-    }
-
-    have_4cat = (url && url.length > 0);
-}
-
-/**
  * Manage availability of interface buttons
- *
- * Some buttons are only available when a 4CAT URL has been provided, or when
- * items have been collected, etc. This function is called periodically to
- * enable or disable buttons accordingly.
  */
 function activate_buttons() {
     document.querySelectorAll("td button").forEach(button => {
@@ -123,11 +48,11 @@ function activate_buttons() {
         let items = parseInt(button.parentNode.parentNode.querySelector('.num-items').innerText);
         let new_status = current;
 
-        if(button.classList.contains('upload-to-4cat') && !is_uploading) {
-            new_status = !(items > 0); //REMOVED have_4cat dependency!
+        if(button.classList.contains('upload-to-clearfeed') && !is_uploading) {
+            new_status = !(items > 0);
             button.classList.remove('tooltippable');
             button.setAttribute('title', '');
-
+    
         } else if(button.classList.contains('download-ndjson') || button.classList.contains('reset')) {
             new_status = !(items > 0);
         }
@@ -233,15 +158,17 @@ async function get_stats() {
             let download_button = createElement("button", {
                 "data-platform": platform,
                 "class": "download-ndjson"
-            }, ".ndjson");
-            let fourcat_button = createElement("button", {
+            }, "Raw Data");
+            let clearfeed_button = createElement("button", {
                 "data-platform": platform,
-                "class": "upload-to-4cat",
+                "class": "upload-to-clearfeed",
+                "style": "font-weight: bold;"
             }, "To ClearFeed");
 
-            actions.appendChild(clear_button);
+
+            actions.appendChild(clearfeed_button);
             actions.appendChild(download_button);
-            actions.appendChild(fourcat_button);
+            actions.appendChild(clear_button);
 
             row.appendChild(actions);
             document.querySelector("#item-table tbody").appendChild(row);
@@ -280,7 +207,6 @@ async function get_stats() {
         }
     });
 
-    set_4cat_url(true);
     activate_buttons();
     update_icon();
     init_tooltips();
@@ -334,18 +260,17 @@ async function button_handler(event) {
 
         event.target.classList.remove('loading');
 
-    // UPDATED THIS BLOCK TO ROUTE TO UPDATED THIS BLOCK TO ROUTE TO CLEARFEED DJANGO BACKEND INSTEAD OF 4CAT
-    } else if (event.target.matches('.upload-to-4cat')) {
+    } else if (event.target.matches('.upload-to-clearfeed')) {
         let platform = event.target.getAttribute('data-platform');
         status.innerText = 'Creating data file for uploading...';
         is_uploading = true;
-        document.querySelectorAll('.upload-to-4cat').forEach(x => x.setAttribute('disabled', true));
+        document.querySelectorAll('.upload-to-clearfeed').forEach(x => x.setAttribute('disabled', true));
         
         try {
             let blob = await get_blob(platform);
             status.innerText = 'Uploading to ClearFeed...';
 
-            let response = await fetch('http://localhost:8000/api/import-dataset/', {
+            let response = await fetch(`${CLEARFEED_URL}/api/import-dataset/`, {
                 method: 'POST',
                 headers: {
                     'X-Zeeschuimer-Platform': platform,
@@ -357,8 +282,13 @@ async function button_handler(event) {
 
             if (response.ok) {
                 status.innerText = 'Upload complete!';
+                await background.db.items.where("source_platform").equals(platform).delete();  // ← added this to delete tweets
+            } else if (response.status === 401) {
+                status.innerHTML = `You're not logged in — <a href="${CLEARFEED_LOGIN_URL}" target="_blank">sign in here</a>.`;
+            } else if (response.status === 400) {
+                status.innerText = 'No data to upload. Browse X/Twitter, then try again.';
             } else {
-                status.innerText = 'Upload failed.';
+                status.innerText = 'Upload failed. Please try again.';
             }
     
         } catch (err) {
@@ -367,17 +297,12 @@ async function button_handler(event) {
         }
 
         is_uploading = false;
-        document.querySelectorAll('.upload-to-4cat').forEach(x => x.removeAttribute('disabled'));
+        document.querySelectorAll('.upload-to-clearfeed').forEach(x => x.removeAttribute('disabled'));
 
     } else if(event.target.matches('#clear-history')) {
         await background.db.uploads.clear();
         document.querySelector('#clear-history').remove();
         document.querySelectorAll("#upload-table tbody tr").forEach(x => x.remove());
-
-    } else if(event.target.matches('#cancel-upload')) {
-        xhr.abort();
-        xhr.aborted = true;
-        status.innerHTML = '';
 
     } else if(event.target.matches('#import-button')) {
         if(!confirm('Importing data will remove all items currently stored. Are you sure?')) {
@@ -455,80 +380,9 @@ async function button_handler(event) {
 }
 
 /**
- * Upload status poller
- */
-const upload_poll = {
-    /**
-     * Start polling for upload status
-     *
-     * Connects to the 4CAT API at the configured URL to check status of a
-     * dataset that has been uploaded and is now being processed.
-     *
-     * @param response
-     * @returns {Promise<void>}
-     */
-    init: async function(response) {
-        let upload_url = await get_4cat_url();
-        let poll_url = upload_url.trim() + '/api/check-query/?key=' + response["key"];
-        let status = document.getElementById('upload-status');
-        let xhr = new XMLHttpRequest();
-        xhr.open("GET", poll_url, true);
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState === xhr.DONE) {
-                return;
-            }
-
-            if (xhr.status !== 200) {
-                status.innerText = 'Error while checking for upload status.'
-                return;
-            }
-
-            let json_response = xhr.responseText.replace(/\n/g, '');
-            let progress;
-            try {
-                progress = JSON.parse(json_response);
-            } catch (SyntaxError) {
-                status.innerText = 'Error during upload: malformed response from 4CAT server.';
-                return;
-            }
-
-            if (!progress["done"]) {
-                status.innerText = 'Processing upload: ' + progress["status"];
-                setTimeout(() => upload_poll.init(response), 1000);
-            } else {
-                status.innerHTML = '';
-                status.appendChild(createElement("span", {},"Upload completed! "));
-                status.appendChild(createElement("a", {"href": progress["url"], "target": "_blank"}, "View dataset."));
-                upload_poll.add_dataset(progress);
-
-                document.querySelectorAll('.upload-to-4cat').forEach(x => x.removeAttribute('disabled'))
-                is_uploading = false;
-            }
-        }
-        xhr.send();
-    },
-
-    /**
-     * Add dataset to Zeeschuimer history
-     *
-     * @param progress
-     * @returns {Promise<void>}
-     */
-    add_dataset: async function(progress) {
-        await background.db.uploads.add({
-            timestamp: (new Date()).getTime(),
-            url: progress["url"],
-            platform: progress["datasource"],
-            items: progress["rows"]
-        });
-    }
-}
-
-/**
  * Get a NDJON dump of items
  *
- * Retuens a Blob with all items in it as JSON files, delimited with newlines.
- * This file can be uploaded to e.g. 4CAT.
+ * Returns a Blob with all items in it as JSON files, delimited with newlines.
  *
  * @param platform
  * @returns {Promise<Blob>}
@@ -659,8 +513,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     setInterval(get_stats, 1000);
 
     document.addEventListener('click', button_handler);
-    document.addEventListener('keyup', set_4cat_url);
-    document.addEventListener('change', set_4cat_url);
+    document.getElementById('view-results-btn').addEventListener('click', function() {
+    browser.tabs.create({url: CLEARFEED_URL});
+    });
 
     const version_container = document.querySelector('.version a');
     const current_version = version_container.innerText;
@@ -674,10 +529,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         version_alert.appendChild(ok_button);
         document.querySelector('header').appendChild(version_alert);
     }
-
-    // Commenting out because 4_cat specific
-   // const fourcat_url = await background.browser.storage.local.get('4cat-url');
-   // document.querySelector('#fourcat-url').value = fourcat_url['4cat-url'] ? fourcat_url['4cat-url'] : '';
 
     const duplicate_behavior = await background.browser.storage.local.get(duplicateBehaviorKey);
     const duplicate_select = document.querySelector('#duplicate-behavior');

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <head>
-    <title>CAPP Zeeschuimer</title>
+    <title>ClearFeed Capture</title>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta http-equiv="Content-Security-Policy" content="script-src *;">
     <link rel="stylesheet" href="tooltips.css">
@@ -398,24 +398,45 @@
         <h1>ClearFeed Capture</h1>
         <span class="version"><a href="https://github.com/teddykolios11/capp-zeeschuimer">v1.1</a></span>
     </header>
-    <section id="status">
+   <section id="status">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin: 0 1em;">
         <h2><span>Captured data objects</span></h2>
-        <div>
-            <table id="item-table">
-                <thead>
-                <tr>
-                    <th colspan="2">Active</th>
-                    <th>Platform</th>
-                    <th>Items</th>
-                    <th>Actions</th>
-                </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-            <button class="reset-all"><i class="fa fa-times"></i> Delete all items</button>
-            <p id="upload-status"></p>  <!-- ADDED THIS LINE SO INTERFACE.JS CAN STILL REFERENCE document.getElementById('upload-status') -->
+        <div style="
+            background: #e8f6fe;
+            border: 1px solid #01A9F6;
+            border-radius: 6px;
+            padding: 3px 18px;
+            margin-top: 0.5em;
+            width: 200px;
+            flex-shrink: 0;
+            font-size: 0.75em;
+            color: #233849;
+            text-align: center;
+            line-height: 1.4;
+        ">
+            ⚠️ Download raw data first - tweets delete on upload.
         </div>
-    </section>
+    </div>
+    <div>
+        <table id="item-table">
+            <thead>
+            <tr>
+                <th colspan="2">Active</th>
+                <th>Platform</th>
+                <th>Items</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <p id="upload-status"></p>
+        
+        <div style="text-align: center; margin-top: 1em; margin-bottom: 1em;">
+            <button id="view-results-btn">View ClearFeed Report</button>
+        </div>
+    </div>
+</section>
+
     <section id="advanced-mode" aria-hidden="true">
         <h2><span>Duplicate handling</span></h2>
         <p class="import-container">
