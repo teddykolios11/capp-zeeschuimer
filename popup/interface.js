@@ -1,4 +1,4 @@
-const CLEARFEED_URL = 'http://localhost:8000'; // change to https://clearfeed.civic.garden for production
+const CLEARFEED_URL = 'https://clearfeed.civic.garden' //'http://localhost:8000'; // change to https://clearfeed.civic.garden for production
 const CLEARFEED_LOGIN_URL =  `${CLEARFEED_URL}/login/`;
 const background = browser.extension.getBackgroundPage();
 var is_uploading = false;
